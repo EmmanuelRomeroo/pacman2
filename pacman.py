@@ -1,4 +1,4 @@
-"""Pacman con fantasmas que buscan el camino más corto."""
+"""Pacman con nuevo tablero y fantasmas inteligentes más rápidos."""
 
 from collections import deque
 from random import choice
@@ -15,6 +15,9 @@ writer = Turtle(visible=False)
 aim = vector(5, 0)
 pacman = vector(-40, -80)
 
+# Cada fantasma realiza dos pasos de 5 píxeles por actualización.
+GHOST_STEPS = 2
+
 ghosts = [
     [vector(-180, 160), vector(5, 0)],
     [vector(-180, -160), vector(0, 5)],
@@ -22,7 +25,6 @@ ghosts = [
     [vector(100, -160), vector(-5, 0)],
 ]
 
-# 0 = pared, 1 = camino con comida, 2 = camino sin comida.
 # 0 = pared, 1 = camino con comida, 2 = camino sin comida.
 tiles = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -143,7 +145,7 @@ def chase(point, course):
             step = direction if first_step is None else first_step
             pending.append((neighbor, step))
 
-    # Si no hay ruta o comparte casilla con Pacman, sigue avanzando.
+    # Movimiento alternativo si no hay ruta o comparte casilla.
     if valid(point + course):
         return course.copy()
 
@@ -180,15 +182,25 @@ def move():
     goto(pacman.x + 10, pacman.y + 10)
     dot(20, 'yellow')
 
-    for point, course in ghosts:
-        # Decide la ruta cuando está alineado con una casilla.
-        if point.x % 20 == 0 and point.y % 20 == 0:
-            plan = chase(point, course)
-            course.x = plan.x
-            course.y = plan.y
+    # Detecta si Pacman se acercó a un fantasma al moverse.
+    caught = any(abs(pacman - point) < 20 for point, _ in ghosts)
 
-        if valid(point + course):
-            point.move(course)
+    for point, course in ghosts:
+        if not caught:
+            for _ in range(GHOST_STEPS):
+                # Recalcula la ruta al llegar a una casilla.
+                if point.x % 20 == 0 and point.y % 20 == 0:
+                    plan = chase(point, course)
+                    course.x = plan.x
+                    course.y = plan.y
+
+                if valid(point + course):
+                    point.move(course)
+
+                # Comprueba la colisión después de cada paso.
+                if abs(pacman - point) < 20:
+                    caught = True
+                    break
 
         up()
         goto(point.x + 10, point.y + 10)
@@ -196,10 +208,9 @@ def move():
 
     update()
 
-    for point, course in ghosts:
-        if abs(pacman - point) < 20:
-            print('¡Fin del juego! Puntuación:', state['score'])
-            return
+    if caught:
+        print('¡Fin del juego! Puntuación:', state['score'])
+        return
 
     ontimer(move, 100)
 
